@@ -162,3 +162,15 @@ Response: `<DemoState>`.
 - `advance`, `retreat`, `lap` y `remove` sobre una lista vacía responden 422 con `detail` ("La lista está vacía…"). Un nombre inexistente en `remove` también es 422. El 404 es solo para lista inexistente.
 - Los nombres se recortan con `strip()` y la unicidad distingue mayúsculas ("ana" y "Ana" son distintos).
 - El servidor guarda como máximo 500 listas de demo (descarta las más antiguas).
+
+## Cambios tras la revisión de código (vigentes)
+- `phase`: el backend no emite `waiting` ni `showdown`; la mano pasa directo a `hand_over` (y al final de la partida a `game_over`). El frontend debe tolerarlas pero no depender de ellas.
+- `bot_action.action` puede ser `"check"` (con `amount: null`) además de `fold`, `call`, `raise` y `all_in`. `fold` también lleva `amount: null`.
+- `game_id` tiene 22 caracteres urlsafe (no adivinable).
+- `POST /games` puede responder **503** si hay 200 partidas activas.
+- Las partidas se descartan tras 30 min sin actividad, o 5 min después de `game_over`; después `GET` da 404 y el WS se cierra con 4404.
+- Códigos de cierre del WebSocket: `4404` partida inexistente, `4403` `Origin` no permitido (si el header existe y no está en la lista de CORS), `4409` conexión reemplazada por otra (solo hay una conexión activa por partida).
+- Un mensaje WS binario, con JSON inválido o de más de 4096 caracteres devuelve `error` con code `bad_message` y la conexión sigue abierta.
+- Si una mano se resuelve al repartir (por ejemplo, un jugador queda all-in en la ciega), el servidor emite `hand_result` (y `game_over` si corresponde) justo después del `state`.
+- Si tras un all-in igualado nadie puede subir, el servidor reparte el resto de las calles hasta el showdown sin pedir acciones.
+- Los jugadores `out` no vuelven a enviar cartas en `state`.
