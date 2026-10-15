@@ -20,6 +20,20 @@ describe('clientReducer', () => {
     s = clientReducer(s, { type: 'state', state: makeState({ phase: 'preflop' }) })
     expect(s.result).toBeNull()
   })
+  it('clears a stale result when a different hand arrives in hand_over', () => {
+    let s = clientReducer(initialClientState, { type: 'state', state: makeState({ phase: 'hand_over', hand_number: 1 }) })
+    s = clientReducer(s, { type: 'hand_result', winners: ['bot1'], pot: 40, hand_name: 'Pareja', showdown: {} })
+    s = clientReducer(s, { type: 'state', state: makeState({ phase: 'hand_over', hand_number: 1 }) })
+    expect(s.result).not.toBeNull()
+    s = clientReducer(s, { type: 'state', state: makeState({ phase: 'hand_over', hand_number: 2 }) })
+    expect(s.result).toBeNull()
+  })
+  it('derives game over winner from a game_over state', () => {
+    const st = makeState({ phase: 'game_over' })
+    st.players = st.players.map((p, i) => (i === 0 ? { ...p, chips: 500, status: 'active' } : { ...p, chips: 0, status: 'out' }))
+    const s = clientReducer(initialClientState, { type: 'state', state: st })
+    expect(s.gameOverWinner).toBe(st.players[0].id)
+  })
   it('handles errors as toasts and dismiss', () => {
     let s = clientReducer(initialClientState, { type: 'error', code: 'not_your_turn', message: 'No es tu turno' })
     expect(s.toasts[0].text).toBe('No es tu turno')

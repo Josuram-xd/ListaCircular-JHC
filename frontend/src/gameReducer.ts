@@ -7,13 +7,14 @@ export interface ClientState {
   state: GameState | null
   log: LogEntry[]
   result: HandResult | null
+  resultHand: number | null
   gameOverWinner: string | null
   toasts: Toast[]
   seq: number
 }
 
 export const initialClientState: ClientState = {
-  state: null, log: [], result: null, gameOverWinner: null, toasts: [], seq: 0,
+  state: null, log: [], result: null, resultHand: null, gameOverWinner: null, toasts: [], seq: 0,
 }
 
 export type Msg =
@@ -43,9 +44,16 @@ export function clientReducer(s: ClientState, m: Msg): ClientState {
   switch (m.type) {
     case 'state': {
       const next: ClientState = { ...s, state: m.state, seq }
-      // al empezar una mano nueva se limpia el resultado anterior
-      if (m.state.phase !== 'hand_over' && m.state.phase !== 'showdown' && m.state.phase !== 'game_over') {
+      // el resultado solo vale para la mano en la que se produjo
+      const betting = m.state.phase !== 'hand_over' && m.state.phase !== 'showdown' && m.state.phase !== 'game_over'
+      if (betting || (s.resultHand !== null && s.resultHand !== m.state.hand_number)) {
         next.result = null
+        next.resultHand = null
+      }
+      // fin de partida derivado del estado (tambien tras reconexion)
+      if (m.state.phase === 'game_over' && !s.gameOverWinner) {
+        const alive = m.state.players.find((p) => p.chips > 0 && p.status !== 'out')
+        if (alive) next.gameOverWinner = alive.id
       }
       return next
     }
@@ -55,7 +63,7 @@ export function clientReducer(s: ClientState, m: Msg): ClientState {
         log: [...s.log, { id: seq, text: describeBotAction(nameOf(s.state, m.player_id), m.action, m.amount) }].slice(-50),
       }
     case 'hand_result':
-      return { ...s, seq, result: { winners: m.winners, pot: m.pot, hand_name: m.hand_name, showdown: m.showdown } }
+      return { ...s, seq, resultHand: s.state?.hand_number ?? null, result: { winners: m.winners, pot: m.pot, hand_name: m.hand_name, showdown: m.showdown } }
     case 'game_over':
       return { ...s, seq, gameOverWinner: m.winner_id }
     case 'error':
