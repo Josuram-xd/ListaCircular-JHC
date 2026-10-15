@@ -39,7 +39,7 @@ export default function Seat({ player, isDealer, isTurn, style }: Props) {
           {player.name}
           {isDealer && <span className="dealer-btn" title="Dealer" data-testid="dealer-btn">D</span>}
         </div>
-        <div className="seat__chips">{player.chips} fichas</div>
+        <div className="seat__chips" key={player.chips}>{player.chips} fichas</div>
         {STATUS_LABEL[player.status] && (
           <div className={`seat__status seat__status--${player.status}`}>{STATUS_LABEL[player.status]}</div>
         )}

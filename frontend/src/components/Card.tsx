@@ -31,6 +31,7 @@ export default function Card({ code, faceDown, small }: Props) {
       role="img"
       aria-label={`${parsed.rank} de ${parsed.sym}`}
       data-testid="card"
+      data-sym={parsed.sym}
     >
       <span className="card__rank">{parsed.rank}</span>
       <span className="card__suit">{parsed.sym}</span>
