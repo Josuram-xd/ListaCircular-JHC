@@ -314,3 +314,13 @@ def test_next_hand_propaga_eventos_de_mano_resuelta_al_iniciar():
 def test_game_guarda_eventos_de_la_primera_mano():
     g = Game("g", bots=1, chips=1000, rng=random.Random(1))
     assert g.eventos_iniciales == []
+
+
+def test_eliminado_no_conserva_cartas_ni_showdown():
+    g = Game("g", bots=2, chips=1000, rng=random.Random(5))
+    b = g.jugador("bot2")
+    b.chips, b.showdown, b.cards = 0, True, ["AS", "KS"]
+    g.reveal = True
+    g.eliminar_sin_fichas()
+    assert b.status == "out" and b.cards == [] and b.showdown is False
+    assert next(p for p in g.state()["players"] if p["id"] == "bot2")["cards"] is None

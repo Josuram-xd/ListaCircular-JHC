@@ -287,6 +287,8 @@ class Game:
                 if self.dealer is n and self.mesa.tamano > 1:
                     self.dealer = self.mesa.retroceder(n)
                 n.dato.status = "out"
+                n.dato.cards = []
+                n.dato.showdown = False
                 self.mesa.eliminar(n)
 
     # ------------------------------------------------------------------ estado

@@ -290,3 +290,25 @@ def test_ws_mensaje_demasiado_largo_responde_bad_message(client):
         assert ws.receive_json()["code"] == "bad_message"
         ws.send_text("{}")
         assert ws.receive_json()["code"] == "bad_message"
+
+
+def test_bot_que_iguala_sin_poner_fichas_emite_check():
+    import random
+    from app.motor import Game
+    g = Game("g", bots=1, chips=1000, rng=random.Random(1), auto_start=False)
+    g.start_hand()
+    # preflop heads-up: el SB (human) iguala; bot1 (BB) ya iguala con 0 por pagar
+    g.apply("human", "call")
+    assert g.turn.dato.id == "bot1" and g.current_bet - g.jugador("bot1").bet == 0
+    assert main._etiqueta_bot(g, "bot1", "call", None) == ("check", None)
+
+
+def test_bot_que_iguala_poniendo_fichas_emite_call():
+    import random
+    from app.motor import Game
+    g = Game("g", bots=1, chips=1000, rng=random.Random(1), auto_start=False)
+    g.start_hand()
+    assert g.turn.dato.id == "human"
+    p = g.jugador("human")
+    assert g.current_bet - p.bet > 0
+    assert main._etiqueta_bot(g, "human", "call", None) == ("call", g.current_bet)

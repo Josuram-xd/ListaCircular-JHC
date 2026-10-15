@@ -106,26 +106,33 @@ async def _turno_de_bot(game: Game) -> bool:
     return game.phase in FASES_APUESTA and game.turn is not None and game.turn.dato.is_bot
 
 
+def _etiqueta_bot(game: Game, pid: str, accion: str, monto) -> tuple:
+    """(accion, monto) que se muestra al cliente; igualar sin fichas es 'check'."""
+    p = game.jugador(pid)
+    if accion == "call":
+        if game.current_bet - p.bet == 0:
+            return "check", None
+        return "call", game.current_bet
+    if accion == "raise":
+        return "raise", monto
+    if accion == "all_in":
+        return "all_in", min(p.bet + p.chips, game.max_bet())
+    return accion, None
+
+
 async def _correr_bots(ws: WebSocket, game: Game) -> None:
     while await _turno_de_bot(game):
         if settings["bot_delay"] > 0:
             await asyncio.sleep(settings["bot_delay"])
         pid = game.turn.dato.id
         accion, monto = decidir(game, pid)
-        p = game.jugador(pid)
-        if accion == "call":
-            mostrado = game.current_bet
-        elif accion == "raise":
-            mostrado = monto
-        elif accion == "all_in":
-            mostrado = min(p.bet + p.chips, game.max_bet())
-        else:
-            mostrado = None
+        mostrado_accion, mostrado = _etiqueta_bot(game, pid, accion, monto)
         try:
             eventos = game.apply(pid, accion, monto)
         except GameError:  # red de seguridad: jamas dejar la partida colgada
-            accion, mostrado = "call", game.current_bet
+            mostrado_accion, mostrado = _etiqueta_bot(game, pid, "call", None)
             eventos = game.apply(pid, "call")
+        accion = mostrado_accion
         await _enviar(ws, {"type": "bot_action", "player_id": pid, "action": accion, "amount": mostrado})
         await _enviar_estado(ws, game)
         for e in eventos:
