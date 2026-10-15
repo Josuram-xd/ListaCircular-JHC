@@ -153,3 +153,12 @@ Response: `<DemoState>`.
 - `steps`: explicación en español, una frase por cada enlace que cambia en la última operación. Debe cubrir los casos borde (lista vacía, un solo nodo apuntándose a sí mismo, eliminar la cabeza, eliminar el puntero).
 - `highlight`: nombres de los nodos afectados, para resaltarlos en la interfaz.
 - Con la lista vacía: `size: 0`, `pointer: null`, `nodes: []`.
+
+### Decisiones de la demo (implementadas en el backend)
+- Estado inicial tras `POST /demo/lists`: `last_op: null`, `steps: []`, `highlight: []`.
+- El puntero inicial es el primer nodo creado; insertar no mueve el puntero. Insertar al inicio cambia la cabeza; insertar al final no.
+- Eliminar el nodo bajo el puntero mueve el puntero al siguiente (si era el último, vuelve a la cabeza). Eliminar la cabeza pasa la cabeza al siguiente. Eliminar el único nodo deja la lista vacía y `pointer: null`.
+- `lap` no mueve el puntero.
+- `advance`, `retreat`, `lap` y `remove` sobre una lista vacía responden 422 con `detail` ("La lista está vacía…"). Un nombre inexistente en `remove` también es 422. El 404 es solo para lista inexistente.
+- Los nombres se recortan con `strip()` y la unicidad distingue mayúsculas ("ana" y "Ana" son distintos).
+- El servidor guarda como máximo 500 listas de demo (descarta las más antiguas).
