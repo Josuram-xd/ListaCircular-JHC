@@ -224,3 +224,69 @@ def test_get_partida_toma_el_lock_de_la_sesion(client):
     assert asyncio.iscoroutinefunction(main.obtener_partida)
     gid = crear(client)
     assert client.get(f"/games/{gid}").status_code == 200
+
+
+def _cierre(ws):
+    """Lee hasta que el servidor cierra; devuelve el codigo."""
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect) as exc:
+        for _ in range(200):
+            ws.receive_json()
+    return exc.value.code
+
+
+def test_ws_rechaza_origin_no_permitido(client):
+    gid = crear(client)
+    with client.websocket_connect(f"/ws/games/{gid}", headers={"origin": "http://evil.example"}) as ws:
+        assert _cierre(ws) == 4403
+
+
+def test_ws_permite_origin_de_la_whitelist_y_sin_origin(client):
+    gid = crear(client)
+    with client.websocket_connect(f"/ws/games/{gid}", headers={"origin": "http://localhost:5173"}) as ws:
+        assert ws.receive_json()["type"] == "state"
+    with client.websocket_connect(f"/ws/games/{gid}") as ws:
+        assert ws.receive_json()["type"] == "state"
+
+
+def test_ws_segunda_conexion_cierra_la_anterior_con_4409(client):
+    gid = crear(client)
+    with client.websocket_connect(f"/ws/games/{gid}") as ws1:
+        ws1.receive_json()
+        with client.websocket_connect(f"/ws/games/{gid}") as ws2:
+            assert ws2.receive_json()["type"] == "state"
+            assert _cierre(ws1) == 4409
+
+
+def _a_turno_humano(ws):
+    leer_hasta_turno_humano(ws, [])
+
+
+def test_ws_frame_binario_responde_bad_message(client):
+    gid = crear(client)
+    with client.websocket_connect(f"/ws/games/{gid}") as ws:
+        _a_turno_humano(ws)
+        ws.send_bytes(b"\x00\x01")
+        assert ws.receive_json()["code"] == "bad_message"
+        ws.send_text("[]")
+        assert ws.receive_json()["code"] == "bad_message"  # sigue viva
+
+
+def test_ws_json_con_recursion_responde_bad_message(client):
+    gid = crear(client)
+    with client.websocket_connect(f"/ws/games/{gid}") as ws:
+        _a_turno_humano(ws)
+        ws.send_text("[" * 4000)
+        assert ws.receive_json()["code"] == "bad_message"
+        ws.send_text("{}")
+        assert ws.receive_json()["code"] == "bad_message"
+
+
+def test_ws_mensaje_demasiado_largo_responde_bad_message(client):
+    gid = crear(client)
+    with client.websocket_connect(f"/ws/games/{gid}") as ws:
+        _a_turno_humano(ws)
+        ws.send_text('{"type": "action", "action": "fold", "x": "' + "a" * 5000 + '"}')
+        assert ws.receive_json()["code"] == "bad_message"
+        ws.send_text("{}")
+        assert ws.receive_json()["code"] == "bad_message"

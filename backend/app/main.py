@@ -6,7 +6,7 @@ import json
 import os
 import secrets
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +35,7 @@ class Sesion:
         self.game = game
         self.lock = asyncio.Lock()
         self.last_activity = _ahora()
+        self.ws_activo: Optional[WebSocket] = None
 
     def tocar(self) -> None:
         self.last_activity = _ahora()
@@ -43,9 +44,12 @@ class Sesion:
 SESIONES: Dict[str, Sesion] = {}
 
 app = FastAPI(title="Poker vs Bots")
+ORIGENES_PERMITIDOS = ["http://localhost:5173"]
+MAX_MENSAJE = 4096  # caracteres maximos por mensaje WS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ORIGENES_PERMITIDOS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -132,10 +136,21 @@ async def _correr_bots(ws: WebSocket, game: Game) -> None:
 async def ws_partida(ws: WebSocket, game_id: str):
     sesion = SESIONES.get(game_id)
     await ws.accept()
+    origen = ws.headers.get("origin")
+    if origen is not None and origen not in ORIGENES_PERMITIDOS:
+        await ws.close(code=4403)
+        return
     if sesion is None:
         await ws.close(code=4404)
         return
     game = sesion.game
+    anterior = sesion.ws_activo
+    sesion.ws_activo = ws  # una sola conexion activa por partida
+    if anterior is not None:
+        try:
+            await anterior.close(code=4409)
+        except Exception:
+            pass
     try:
         async with sesion.lock:
             sesion.tocar()
@@ -145,12 +160,23 @@ async def ws_partida(ws: WebSocket, game_id: str):
                 await _enviar(ws, e)
             await _correr_bots(ws, game)
         while True:
-            texto = await ws.receive_text()
+            mensaje = await ws.receive()
+            if mensaje["type"] == "websocket.disconnect":
+                return
+            texto = mensaje.get("text")
             async with sesion.lock:
                 sesion.tocar()
-                await _procesar(ws, game, texto)
-    except WebSocketDisconnect:
+                if texto is None:
+                    await _error(ws, "bad_message", "Se esperaba un mensaje de texto")
+                elif len(texto) > MAX_MENSAJE:
+                    await _error(ws, "bad_message", "Mensaje demasiado largo")
+                else:
+                    await _procesar(ws, game, texto)
+    except (WebSocketDisconnect, RuntimeError):
         return
+    finally:
+        if sesion.ws_activo is ws:
+            sesion.ws_activo = None
 
 
 async def _error(ws: WebSocket, code: str, message: str) -> None:
@@ -160,7 +186,7 @@ async def _error(ws: WebSocket, code: str, message: str) -> None:
 async def _procesar(ws: WebSocket, game: Game, texto: str) -> None:
     try:
         msg = json.loads(texto)
-    except ValueError:
+    except (ValueError, RecursionError):
         return await _error(ws, "bad_message", "JSON invalido")
     if not isinstance(msg, dict):
         return await _error(ws, "bad_message", "Se esperaba un objeto JSON")
