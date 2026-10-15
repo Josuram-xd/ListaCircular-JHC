@@ -13,7 +13,7 @@ export default function App() {
   const [gameId, setGameId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { client, status, send, dismissToast } = useGameSocket(gameId)
+  const { client, status, send, dismissToast, closeReason } = useGameSocket(gameId)
 
   const play = async (bots: number, chips: number) => {
     setLoading(true)
@@ -53,7 +53,7 @@ export default function App() {
       {status !== 'open' && (
         <div className="conn" role="alert">
           {status === 'closed'
-            ? <>Conexión perdida. <button className="btn" onClick={reset}>Volver al inicio</button></>
+            ? <>{closeReason ?? 'Conexión perdida'}. <button className="btn" onClick={reset}>Volver al inicio</button></>
             : status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}
         </div>
       )}

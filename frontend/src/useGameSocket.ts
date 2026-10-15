@@ -7,13 +7,26 @@ export type ConnStatus = 'connecting' | 'open' | 'reconnecting' | 'closed'
 
 const MAX_RETRIES = 5
 
+/** Cierres definitivos del servidor: no se reintenta. */
+export const FATAL_CLOSE: Record<number, string> = {
+  4404: 'Partida no encontrada',
+  4403: 'Conexión rechazada',
+  4409: 'Partida abierta en otra pestaña',
+}
+
+export function backoffDelay(retry: number, base: number): number {
+  return base * 2 ** (retry - 1)
+}
+
 export function useGameSocket(gameId: string | null, retryDelayMs = 1500) {
   const [client, dispatch] = useReducer(clientReducer, initialClientState)
   const [status, setStatus] = useState<ConnStatus>('closed')
+  const [closeReason, setCloseReason] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
     if (!gameId) { setStatus('closed'); return }
+    setCloseReason(null)
     let disposed = false
     let retries = 0
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -30,12 +43,18 @@ export function useGameSocket(gameId: string | null, retryDelayMs = 1500) {
           dispatch({ type: 'notice', text: 'Mensaje inválido del servidor' })
         }
       }
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
         if (disposed) return
+        const fatal = FATAL_CLOSE[ev?.code]
+        if (fatal) {
+          setCloseReason(fatal)
+          setStatus('closed')
+          return
+        }
         if (retries < MAX_RETRIES) {
           retries += 1
           setStatus('reconnecting')
-          timer = setTimeout(connect, retryDelayMs)
+          timer = setTimeout(connect, backoffDelay(retries, retryDelayMs))
         } else {
           setStatus('closed')
         }
@@ -63,5 +82,5 @@ export function useGameSocket(gameId: string | null, retryDelayMs = 1500) {
 
   const dismissToast = useCallback((id: number) => dispatch({ type: 'dismiss_toast', id }), [])
 
-  return { client, status, send, dismissToast }
+  return { client, status, send, dismissToast, closeReason }
 }
