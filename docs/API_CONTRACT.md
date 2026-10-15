@@ -101,3 +101,55 @@ Cadena de 2 caracteres: rango + palo. Rangos `2-9, T, J, Q, K, A`. Palos `S` (pi
 
 ## Requisito del backend: lista circular
 El orden de la mesa (dealer, ciegas, turnos, eliminación) debe implementarse con una **lista circular doblemente enlazada de nodos propia** (`NodoJugador` con `siguiente` y `anterior`). No se permite usar `list`/`deque` para el orden de la mesa.
+
+## Demo de la lista circular (menú educativo)
+
+Sirve para mostrar paso a paso cómo funciona la lista circular doblemente enlazada **real** del backend (la misma clase `ListaCircular` que usa la mesa). El estado vive en memoria, independiente de las partidas.
+
+### `POST /demo/lists`
+Request opcional: `{ "names": ["Ana", "Luis", "Eva"] }` (0 a 12 nombres). Sin body, crea una lista vacía.
+Response 201: `{ "list_id": "x1y2", "state": <DemoState> }`.
+
+### `POST /demo/lists/{list_id}/ops`
+Request:
+```json
+{ "op": "insert", "name": "Marta", "where": "end" }
+{ "op": "remove", "name": "Luis" }
+{ "op": "advance" }
+{ "op": "retreat" }
+{ "op": "lap" }
+{ "op": "reset" }
+```
+- `where` en `insert`: `start | end | after_pointer`. Máximo 12 nodos; nombres únicos, 1 a 12 caracteres.
+- `lap` recorre una vuelta completa desde el puntero y vuelve al punto de partida.
+- Errores: 404 lista inexistente, 422 operación o datos inválidos (con `detail` en español).
+Response 200: `<DemoState>`.
+
+### `GET /demo/lists/{list_id}`
+Response: `<DemoState>`.
+
+### `DemoState`
+```json
+{
+  "list_id": "x1y2",
+  "size": 3,
+  "pointer": "Ana",
+  "nodes": [
+    { "name": "Ana",  "next": "Luis", "prev": "Eva",  "is_head": true,  "is_pointer": true },
+    { "name": "Luis", "next": "Eva",  "prev": "Ana",  "is_head": false, "is_pointer": false },
+    { "name": "Eva",  "next": "Ana",  "prev": "Luis", "is_head": false, "is_pointer": false }
+  ],
+  "last_op": { "op": "insert", "name": "Eva", "where": "end" },
+  "steps": [
+    "Se crea el nodo Eva.",
+    "Eva.anterior = Luis (el último actual).",
+    "Eva.siguiente = Ana (la cabeza), así se cierra el círculo.",
+    "Luis.siguiente = Eva y Ana.anterior = Eva."
+  ],
+  "highlight": ["Eva", "Luis", "Ana"]
+}
+```
+- `nodes` va en el orden de recorrido a partir de la cabeza (`is_head`).
+- `steps`: explicación en español, una frase por cada enlace que cambia en la última operación. Debe cubrir los casos borde (lista vacía, un solo nodo apuntándose a sí mismo, eliminar la cabeza, eliminar el puntero).
+- `highlight`: nombres de los nodos afectados, para resaltarlos en la interfaz.
+- Con la lista vacía: `size: 0`, `pointer: null`, `nodes: []`.
