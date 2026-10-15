@@ -46,6 +46,26 @@ class ListaCircular:
         self._tamano += 1
         return nodo
 
+    def insertar_inicio(self, dato: Any) -> NodoJugador:
+        """Inserta antes de la cabeza y el nuevo nodo pasa a ser la cabeza."""
+        nodo = self.insertar(dato)
+        self.cabeza = nodo
+        return nodo
+
+    def insertar_despues(self, referencia: NodoJugador, dato: Any) -> NodoJugador:
+        """Inserta un nodo nuevo justo despues de `referencia`."""
+        if referencia is None or referencia._lista is not self:
+            raise ValueError("Nodo invalido")
+        nodo = NodoJugador(dato)
+        nodo._lista = self
+        sig = referencia.siguiente
+        nodo.anterior = referencia
+        nodo.siguiente = sig
+        referencia.siguiente = nodo
+        sig.anterior = nodo
+        self._tamano += 1
+        return nodo
+
     def eliminar(self, nodo: NodoJugador) -> Any:
         """Elimina el nodo (cabeza, medio, ultimo o unico). Devuelve su dato."""
         if nodo is None or nodo._lista is not self:

@@ -114,3 +114,17 @@ def test_buscar():
 def test_avanzar_en_lista_vacia_falla():
     with pytest.raises(ValueError):
         ListaCircular().avanzar(None)
+
+
+def test_insertar_inicio_y_despues():
+    from app.lista_circular import ListaCircular
+
+    lc = ListaCircular()
+    a = lc.insertar_inicio("A")
+    assert lc.cabeza is a and a.siguiente is a
+    c = lc.insertar("C")
+    b = lc.insertar_despues(a, "B")
+    z = lc.insertar_inicio("Z")
+    assert list(lc) == ["Z", "A", "B", "C"] and lc.cabeza is z
+    assert z.anterior is c and c.siguiente is z and b.anterior is a
+    assert len(lc) == 4
