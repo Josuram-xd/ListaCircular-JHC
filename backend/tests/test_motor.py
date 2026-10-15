@@ -324,3 +324,19 @@ def test_eliminado_no_conserva_cartas_ni_showdown():
     g.eliminar_sin_fichas()
     assert b.status == "out" and b.cards == [] and b.showdown is False
     assert next(p for p in g.state()["players"] if p["id"] == "bot2")["cards"] is None
+
+
+def test_sin_opciones_de_apuesta_reparte_hasta_el_river_y_resuelve():
+    g = Game("g", bots=2, chips=1000, rng=random.Random(7), auto_start=False)
+    g.jugador("bot1").chips = 100  # SB corto
+    g.start_hand()
+    assert g.turn.dato.id == "human"
+    g.apply("human", "call")           # 20
+    g.apply("bot1", "all_in")          # all-in por 100
+    g.apply("bot2", "call")            # bb iguala; humano debe igualar
+    eventos = g.apply("human", "call")
+    # human y bot2 siguen activos pero ya no pueden subir: sin pedir checks
+    assert g.phase == "hand_over"
+    assert len(g.community) == 5
+    assert eventos and eventos[0]["type"] == "hand_result"
+    assert sum(j.chips for j in g.todos) == 2100

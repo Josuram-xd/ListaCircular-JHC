@@ -157,7 +157,10 @@ class Game:
 
     def _buscar_actor(self, desde: NodoJugador, inclusivo: bool) -> Optional[NodoJugador]:
         activos = [n for n in self.mesa.nodos() if n.dato.status == "active"]
-        if len(activos) <= 1 and all(n.dato.bet >= self.current_bet for n in activos):
+        igualados = all(n.dato.bet >= self.current_bet for n in activos)
+        if igualados and (len(activos) <= 1 or self.max_bet() <= self.current_bet):
+            # un solo activo, o ya nadie puede subir (hay un all-in igualado):
+            # no hay mas decisiones, se reparten las calles restantes.
             return None
         inicio = desde if inclusivo else desde.siguiente
         for n in self.mesa.nodos(inicio):
