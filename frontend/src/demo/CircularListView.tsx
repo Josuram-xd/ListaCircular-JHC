@@ -5,8 +5,8 @@ interface Props {
   onNodeClick?: (name: string) => void
 }
 
-const W = 640
-const H = 560
+const W = 560
+const H = 500
 const CX = W / 2
 const CY = H / 2
 const NODE_R = 30
@@ -15,7 +15,7 @@ type P = { x: number; y: number }
 
 function positions(n: number): P[] {
   if (n === 1) return [{ x: CX, y: CY }]
-  const R = n <= 2 ? 150 : Math.min(200, 110 + n * 12)
+  const R = n <= 2 ? 150 : Math.min(185, 105 + n * 12)
   return Array.from({ length: n }, (_, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / n
     return { x: CX + R * Math.cos(a), y: CY + R * Math.sin(a) }
