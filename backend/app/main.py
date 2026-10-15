@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .bots import decidir
+from .demo import router as demo_router
 from .motor import FASES_APUESTA, Game, GameError
 
 # Retardo entre acciones de bots (segundos). Configurable: env POKER_BOT_DELAY
@@ -34,6 +35,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(demo_router)
 
 
 class NuevaPartida(BaseModel):
