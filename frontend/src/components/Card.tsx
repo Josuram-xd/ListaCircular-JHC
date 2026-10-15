@@ -23,11 +23,12 @@ export default function Card({ code, faceDown, small }: Props) {
   const size = small ? ' card--small' : ''
   const parsed = !faceDown && code ? parseCard(code) : null
   if (!parsed) {
-    return <div className={`card card--back${size}`} data-testid="card-back" aria-label="Carta oculta" />
+    return <div className={`card card--back${size}`} data-testid="card-back" role="img" aria-label="Carta oculta" />
   }
   return (
     <div
       className={`card ${parsed.red ? 'card--red' : 'card--black'}${size}`}
+      role="img"
       aria-label={`${parsed.rank} de ${parsed.sym}`}
       data-testid="card"
     >

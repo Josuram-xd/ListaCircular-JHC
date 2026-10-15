@@ -25,4 +25,11 @@ describe('Table', () => {
     render(<Table state={s} />)
     expect(screen.getAllByTestId('card')).toHaveLength(3 + 2 + 2)
   })
+  it('translates the phase and marks the current turn seat', () => {
+    render(<Table state={makeState()} />)
+    expect(screen.getByText(/Pre-flop/)).toBeInTheDocument()
+    expect(screen.getByTestId('seat-human')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('seat-bot1')).not.toHaveAttribute('aria-current')
+    expect(screen.getAllByRole('img', { name: /K de/ })).toHaveLength(1)
+  })
 })

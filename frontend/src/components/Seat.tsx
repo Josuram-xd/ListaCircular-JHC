@@ -26,7 +26,7 @@ export default function Seat({ player, isDealer, isTurn, style }: Props) {
   ].filter(Boolean).join(' ')
 
   return (
-    <div className={cls} style={style} data-testid={`seat-${player.id}`}>
+    <div className={cls} style={style} aria-current={isTurn ? 'true' : undefined} data-testid={`seat-${player.id}`}>
       {showCards && (
         <div className="seat__cards">
           {player.cards && player.cards.length > 0

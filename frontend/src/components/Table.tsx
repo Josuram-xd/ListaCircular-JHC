@@ -10,6 +10,17 @@ export function seatPosition(i: number, n: number): { left: string; top: string 
   return { left: `${left.toFixed(2)}%`, top: `${top.toFixed(2)}%` }
 }
 
+export const PHASE_LABEL: Record<string, string> = {
+  waiting: 'Esperando',
+  preflop: 'Pre-flop',
+  flop: 'Flop',
+  turn: 'Turn',
+  river: 'River',
+  showdown: 'Showdown',
+  hand_over: 'Fin de mano',
+  game_over: 'Fin de partida',
+}
+
 export default function Table({ state }: { state: GameState }) {
   const n = state.players.length
   const slots = Array.from({ length: 5 }, (_, i) => state.community[i] ?? null)
@@ -23,7 +34,7 @@ export default function Table({ state }: { state: GameState }) {
               c ? <Card key={i} code={c} /> : <div key={i} className="card card--empty" />,
             )}
           </div>
-          <div className="table__phase">Mano #{state.hand_number} · {state.phase}</div>
+          <div className="table__phase">Mano #{state.hand_number} · {PHASE_LABEL[state.phase] ?? state.phase}</div>
         </div>
       </div>
       {state.players.map((p, i) => (

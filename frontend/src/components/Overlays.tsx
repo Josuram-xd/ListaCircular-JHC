@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { GameState, HandResult } from '../types'
 import type { LogEntry, Toast } from '../gameReducer'
 
@@ -16,7 +16,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
     return () => clearTimeout(h)
   }, [toast.id, onDismiss])
   return (
-    <div className="toast" onClick={() => onDismiss(toast.id)}>{toast.text}</div>
+    <button type="button" className="toast" onClick={() => onDismiss(toast.id)}>{toast.text}</button>
   )
 }
 
@@ -53,12 +53,14 @@ export function GameOver({
 }: { winnerId: string; state: GameState | null; onAgain: () => void }) {
   const winner = state?.players.find((p) => p.id === winnerId)
   const human = winnerId === 'human'
+  const btnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { btnRef.current?.focus() }, [])
   return (
-    <div className="overlay" data-testid="game-over">
+    <div className="overlay" data-testid="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
       <div className="overlay__card">
-        <h2>{human ? '¡Ganaste la partida!' : 'Fin de la partida'}</h2>
+        <h2 id="game-over-title">{human ? '¡Ganaste la partida!' : 'Fin de la partida'}</h2>
         <p>{human ? 'Eliminaste a todos los bots.' : `Ganador: ${winner?.name ?? winnerId}`}</p>
-        <button className="btn btn--primary btn--big" onClick={onAgain}>Jugar de nuevo</button>
+        <button ref={btnRef} className="btn btn--primary btn--big" onClick={onAgain}>Jugar de nuevo</button>
       </div>
     </div>
   )

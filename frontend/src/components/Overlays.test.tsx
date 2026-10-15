@@ -23,4 +23,9 @@ describe('Overlays', () => {
     fireEvent.click(screen.getByText('Jugar de nuevo'))
     expect(onAgain).toHaveBeenCalled()
   })
+  it('game over is a modal dialog with initial focus on its button', () => {
+    render(<GameOver winnerId="human" state={makeState()} onAgain={vi.fn()} />)
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByText('Jugar de nuevo')).toHaveFocus()
+  })
 })
