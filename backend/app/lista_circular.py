@@ -84,6 +84,9 @@ class ListaCircular:
         return nodo.dato
 
     def avanzar(self, nodo: Optional[NodoJugador], pasos: int = 1) -> NodoJugador:
+        """Avanza `pasos` (>= 0) nodos; ValueError si pasos < 0 o el nodo es ajeno."""
+        if pasos < 0:
+            raise ValueError("pasos no puede ser negativo")
         if nodo is None or nodo._lista is not self:
             raise ValueError("Nodo invalido")
         for _ in range(pasos):
@@ -91,6 +94,9 @@ class ListaCircular:
         return nodo
 
     def retroceder(self, nodo: Optional[NodoJugador], pasos: int = 1) -> NodoJugador:
+        """Retrocede `pasos` (>= 0) nodos; ValueError si pasos < 0 o el nodo es ajeno."""
+        if pasos < 0:
+            raise ValueError("pasos no puede ser negativo")
         if nodo is None or nodo._lista is not self:
             raise ValueError("Nodo invalido")
         for _ in range(pasos):
@@ -98,7 +104,22 @@ class ListaCircular:
         return nodo
 
     def nodos(self, desde: Optional[NodoJugador] = None) -> Iterator[NodoJugador]:
-        """Recorre una vuelta completa de nodos empezando en `desde` (o la cabeza)."""
+        """Recorre una vuelta completa de nodos empezando en `desde` (o la cabeza).
+
+        Lanza ValueError (al llamar, no al iterar) si `desde` no pertenece a la lista.
+
+        Contrato de iteracion al eliminar: el recorrido hace exactamente `tamano`
+        pasos (el tamano se fija al empezar) y guarda el siguiente nodo ANTES de
+        ceder el actual, por lo que es seguro eliminar el nodo que se acaba de
+        recibir. Eliminar cualquier otro nodo durante el recorrido no esta
+        soportado (puede repetir u omitir nodos); si hace falta, materializar
+        antes con list(lista.nodos()).
+        """
+        if desde is not None and desde._lista is not self:
+            raise ValueError("El nodo no pertenece a esta lista")
+        return self._recorrer(desde)
+
+    def _recorrer(self, desde: Optional[NodoJugador]) -> Iterator[NodoJugador]:
         inicio = desde if desde is not None else self.cabeza
         if inicio is None:
             return

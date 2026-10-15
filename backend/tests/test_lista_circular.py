@@ -128,3 +128,44 @@ def test_insertar_inicio_y_despues():
     assert list(lc) == ["Z", "A", "B", "C"] and lc.cabeza is z
     assert z.anterior is c and c.siguiente is z and b.anterior is a
     assert len(lc) == 4
+
+
+def test_nodos_desde_nodo_ajeno_lanza_value_error():
+    a, b = ListaCircular(), ListaCircular()
+    a.insertar(1)
+    ajeno = b.insertar(2)
+    with pytest.raises(ValueError):
+        list(a.nodos(ajeno))
+    with pytest.raises(ValueError):  # falla al llamar, no al iterar
+        a.nodos(ajeno)
+
+
+def test_nodos_desde_nodo_eliminado_lanza_value_error():
+    lista = ListaCircular()
+    n = lista.insertar(1)
+    lista.insertar(2)
+    lista.eliminar(n)
+    with pytest.raises(ValueError):
+        lista.nodos(n)
+
+
+@pytest.mark.parametrize("metodo", ["avanzar", "retroceder"])
+def test_pasos_negativos_lanzan_value_error(metodo):
+    lista = ListaCircular()
+    n = lista.insertar(1)
+    lista.insertar(2)
+    with pytest.raises(ValueError):
+        getattr(lista, metodo)(n, -1)
+
+
+def test_eliminar_durante_la_iteracion_es_seguro_para_el_nodo_actual():
+    lista = ListaCircular()
+    for i in range(5):
+        lista.insertar(i)
+    vistos = []
+    for n in lista.nodos():
+        vistos.append(n.dato)
+        if n.dato % 2 == 0:
+            lista.eliminar(n)
+    assert vistos == [0, 1, 2, 3, 4]
+    assert [d for d in lista] == [1, 3]
