@@ -101,3 +101,76 @@ Cadena de 2 caracteres: rango + palo. Rangos `2-9, T, J, Q, K, A`. Palos `S` (pi
 
 ## Requisito del backend: lista circular
 El orden de la mesa (dealer, ciegas, turnos, eliminación) debe implementarse con una **lista circular doblemente enlazada de nodos propia** (`NodoJugador` con `siguiente` y `anterior`). No se permite usar `list`/`deque` para el orden de la mesa.
+
+## Demo de la lista circular (menú educativo)
+
+Sirve para mostrar paso a paso cómo funciona la lista circular doblemente enlazada **real** del backend (la misma clase `ListaCircular` que usa la mesa). El estado vive en memoria, independiente de las partidas.
+
+### `POST /demo/lists`
+Request opcional: `{ "names": ["Ana", "Luis", "Eva"] }` (0 a 12 nombres). Sin body, crea una lista vacía.
+Response 201: `{ "list_id": "x1y2", "state": <DemoState> }`.
+
+### `POST /demo/lists/{list_id}/ops`
+Request:
+```json
+{ "op": "insert", "name": "Marta", "where": "end" }
+{ "op": "remove", "name": "Luis" }
+{ "op": "advance" }
+{ "op": "retreat" }
+{ "op": "lap" }
+{ "op": "reset" }
+```
+- `where` en `insert`: `start | end | after_pointer`. Máximo 12 nodos; nombres únicos, 1 a 12 caracteres.
+- `lap` recorre una vuelta completa desde el puntero y vuelve al punto de partida.
+- Errores: 404 lista inexistente, 422 operación o datos inválidos (con `detail` en español).
+Response 200: `<DemoState>`.
+
+### `GET /demo/lists/{list_id}`
+Response: `<DemoState>`.
+
+### `DemoState`
+```json
+{
+  "list_id": "x1y2",
+  "size": 3,
+  "pointer": "Ana",
+  "nodes": [
+    { "name": "Ana",  "next": "Luis", "prev": "Eva",  "is_head": true,  "is_pointer": true },
+    { "name": "Luis", "next": "Eva",  "prev": "Ana",  "is_head": false, "is_pointer": false },
+    { "name": "Eva",  "next": "Ana",  "prev": "Luis", "is_head": false, "is_pointer": false }
+  ],
+  "last_op": { "op": "insert", "name": "Eva", "where": "end" },
+  "steps": [
+    "Se crea el nodo Eva.",
+    "Eva.anterior = Luis (el último actual).",
+    "Eva.siguiente = Ana (la cabeza), así se cierra el círculo.",
+    "Luis.siguiente = Eva y Ana.anterior = Eva."
+  ],
+  "highlight": ["Eva", "Luis", "Ana"]
+}
+```
+- `nodes` va en el orden de recorrido a partir de la cabeza (`is_head`).
+- `steps`: explicación en español, una frase por cada enlace que cambia en la última operación. Debe cubrir los casos borde (lista vacía, un solo nodo apuntándose a sí mismo, eliminar la cabeza, eliminar el puntero).
+- `highlight`: nombres de los nodos afectados, para resaltarlos en la interfaz.
+- Con la lista vacía: `size: 0`, `pointer: null`, `nodes: []`.
+
+### Decisiones de la demo (implementadas en el backend)
+- Estado inicial tras `POST /demo/lists`: `last_op: null`, `steps: []`, `highlight: []`.
+- El puntero inicial es el primer nodo creado; insertar no mueve el puntero. Insertar al inicio cambia la cabeza; insertar al final no.
+- Eliminar el nodo bajo el puntero mueve el puntero al siguiente (si era el último, vuelve a la cabeza). Eliminar la cabeza pasa la cabeza al siguiente. Eliminar el único nodo deja la lista vacía y `pointer: null`.
+- `lap` no mueve el puntero.
+- `advance`, `retreat`, `lap` y `remove` sobre una lista vacía responden 422 con `detail` ("La lista está vacía…"). Un nombre inexistente en `remove` también es 422. El 404 es solo para lista inexistente.
+- Los nombres se recortan con `strip()` y la unicidad distingue mayúsculas ("ana" y "Ana" son distintos).
+- El servidor guarda como máximo 500 listas de demo (descarta las más antiguas).
+
+## Cambios tras la revisión de código (vigentes)
+- `phase`: el backend no emite `waiting` ni `showdown`; la mano pasa directo a `hand_over` (y al final de la partida a `game_over`). El frontend debe tolerarlas pero no depender de ellas.
+- `bot_action.action` puede ser `"check"` (con `amount: null`) además de `fold`, `call`, `raise` y `all_in`. `fold` también lleva `amount: null`.
+- `game_id` tiene 22 caracteres urlsafe (no adivinable).
+- `POST /games` puede responder **503** si hay 200 partidas activas.
+- Las partidas se descartan tras 30 min sin actividad, o 5 min después de `game_over`; después `GET` da 404 y el WS se cierra con 4404.
+- Códigos de cierre del WebSocket: `4404` partida inexistente, `4403` `Origin` no permitido (si el header existe y no está en la lista de CORS), `4409` conexión reemplazada por otra (solo hay una conexión activa por partida).
+- Un mensaje WS binario, con JSON inválido o de más de 4096 caracteres devuelve `error` con code `bad_message` y la conexión sigue abierta.
+- Si una mano se resuelve al repartir (por ejemplo, un jugador queda all-in en la ciega), el servidor emite `hand_result` (y `game_over` si corresponde) justo después del `state`.
+- Si tras un all-in igualado nadie puede subir, el servidor reparte el resto de las calles hasta el showdown sin pedir acciones.
+- Los jugadores `out` no vuelven a enviar cartas en `state`.
