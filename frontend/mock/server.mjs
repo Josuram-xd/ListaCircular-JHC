@@ -1,5 +1,6 @@
 // Servidor mock del contrato docs/API_CONTRACT.md (REST + WebSocket).
 // Partida simulada simple: sin evaluador real de manos (el ganador del showdown es aleatorio).
+import { handleDemo } from './demo.mjs'
 import http from 'node:http'
 import { WebSocketServer } from 'ws'
 
@@ -266,6 +267,7 @@ const server = http.createServer((req, res) => {
   const json = (code, body) => { res.writeHead(code, { ...cors, 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)) }
   if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end() }
   const url = new URL(req.url, 'http://x')
+  if (handleDemo(req, url, json)) return
   if (req.method === 'POST' && url.pathname === '/games') {
     let body = ''
     req.on('data', (c) => (body += c))
