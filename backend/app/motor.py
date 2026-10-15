@@ -66,8 +66,11 @@ class Game:
         self.baraja: Optional[Baraja] = None
         self.reveal = False
         self.winner_id: Optional[str] = None
+        # eventos (hand_result/game_over) de una primera mano resuelta al repartir;
+        # el servidor los envia al primer cliente que se conecta.
+        self.eventos_iniciales: List[dict] = []
         if auto_start:
-            self.start_hand()
+            self.eventos_iniciales = self.start_hand()
 
     # ------------------------------------------------------------ utilidades
     def _agregar(self, j: Jugador) -> None:
@@ -96,7 +99,7 @@ class Game:
             p.status = "all_in"
 
     # ----------------------------------------------------------------- mano
-    def start_hand(self) -> None:
+    def start_hand(self) -> List[dict]:
         if self.phase not in ("waiting", "hand_over"):
             raise GameError("illegal_action", "La mano actual no ha terminado")
         self.hand_number += 1
@@ -131,9 +134,9 @@ class Game:
         actor = self._buscar_actor(primero, inclusivo=True)
         if actor is not None:
             self.turn = actor
-        else:
-            self.turn = None
-            self._cerrar_ronda()
+            return []
+        self.turn = None
+        return self._cerrar_ronda()
 
     def _recortar_exceso(self) -> None:
         """Devuelve lo apostado por encima del tope (sin side pots)."""
@@ -209,8 +212,7 @@ class Game:
     def next_hand(self) -> List[dict]:
         if self.phase != "hand_over":
             raise GameError("illegal_action", "La mano aun no termina")
-        self.start_hand()
-        return []
+        return self.start_hand()
 
     # ---------------------------------------------------------- flujo de mano
     def _despues_de_actuar(self, nodo: NodoJugador) -> List[dict]:

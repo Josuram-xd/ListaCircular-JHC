@@ -110,6 +110,9 @@ async def ws_partida(ws: WebSocket, game_id: str):
     try:
         async with sesion.lock:
             await _enviar_estado(ws, game)
+            pendientes, game.eventos_iniciales = game.eventos_iniciales, []
+            for e in pendientes:
+                await _enviar(ws, e)
             await _correr_bots(ws, game)
         while True:
             texto = await ws.receive_text()

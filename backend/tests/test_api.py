@@ -140,3 +140,41 @@ def test_ws_partida_inexistente_cierra(client):
     with pytest.raises(Exception):
         with client.websocket_connect("/ws/games/nope") as ws:
             ws.receive_json()
+
+
+def sesion_rigged(gid="rigged", seed=5):
+    """Partida cuya primera mano se resuelve sola al repartir (humano 5 fichas)."""
+    import random
+    from app.motor import Game
+    g = Game(gid, bots=1, chips=1000, rng=random.Random(seed), auto_start=False)
+    g.jugador("human").chips = 5
+    g.jugador("bot1").chips = 1995
+    g.eventos_iniciales = g.start_hand()
+    main.SESIONES[gid] = main.Sesion(g)
+    return g
+
+
+def test_ws_envia_eventos_de_primera_mano_resuelta_al_repartir(client):
+    g = sesion_rigged("rig1")
+    with client.websocket_connect("/ws/games/rig1") as ws:
+        assert ws.receive_json()["type"] == "state"
+        assert ws.receive_json()["type"] == "hand_result"
+        if g.phase == "game_over":
+            assert ws.receive_json()["type"] == "game_over"
+
+
+def test_ws_next_hand_envia_eventos_de_mano_resuelta_al_repartir(client):
+    g = sesion_rigged("rig2", seed=3)
+    assert g.phase == "hand_over"
+    with client.websocket_connect("/ws/games/rig2") as ws:
+        while ws.receive_json()["type"] != "hand_result":
+            pass
+        for j in g.todos:
+            j.chips = 0
+        g.jugador("human").chips = 5
+        g.jugador("bot1").chips = 1995
+        ws.send_json({"type": "next_hand"})
+        tipos = []
+        while "hand_result" not in tipos:
+            tipos.append(ws.receive_json()["type"])
+        assert tipos[0] == "state"

@@ -274,9 +274,43 @@ def test_mesa_usa_lista_circular():
 def test_ciega_corta_all_in_en_las_ciegas():
     g = Game("g", bots=1, chips=1000, rng=random.Random(5), auto_start=False)
     g.jugador("bot1").chips = 5  # no alcanza la ciega grande
-    g.start_hand()
+    eventos = g.start_hand()
     s = g.state()
     # sin side pots: la apuesta se limita al menor stack, el exceso se devuelve
-    assert s["phase"] in ("preflop", "hand_over", "game_over")
+    assert s["phase"] in ("hand_over", "game_over")
+    assert eventos and eventos[0]["type"] == "hand_result"
     total = sum(p["chips"] + p["bet"] for p in s["players"])
     assert total == 1005
+
+
+def test_mano_resuelta_dentro_de_start_hand_devuelve_eventos():
+    # heads-up: humano SB con 5 fichas queda all-in en la ciega; nadie actua
+    g = Game("g", bots=1, chips=1000, rng=random.Random(5), auto_start=False)
+    g.jugador("human").chips = 5
+    g.jugador("bot1").chips = 1995
+    eventos = g.start_hand()
+    assert g.phase in ("hand_over", "game_over")
+    tipos = [e["type"] for e in eventos]
+    assert tipos[0] == "hand_result"
+    assert sum(j.chips for j in g.todos) == 2000
+    if g.phase == "game_over":
+        assert tipos[-1] == "game_over"
+
+
+def test_next_hand_propaga_eventos_de_mano_resuelta_al_iniciar():
+    g = Game("g", bots=1, chips=1000, rng=random.Random(5))
+    g.apply(g.turn.dato.id, "fold")
+    assert g.phase == "hand_over"
+    # fuerza que la siguiente mano se resuelva sola: el humano queda con 5
+    for j in g.todos:
+        j.chips = 0
+    g.jugador("human").chips = 5
+    g.jugador("bot1").chips = 1995
+    # el dealer rota a bot1: bot1 SB, human BB(5 all-in); bot1 no puede actuar
+    eventos = g.next_hand()
+    assert eventos and eventos[0]["type"] == "hand_result"
+
+
+def test_game_guarda_eventos_de_la_primera_mano():
+    g = Game("g", bots=1, chips=1000, rng=random.Random(1))
+    assert g.eventos_iniciales == []
