@@ -178,3 +178,49 @@ def test_ws_next_hand_envia_eventos_de_mano_resuelta_al_repartir(client):
         while "hand_result" not in tipos:
             tipos.append(ws.receive_json()["type"])
         assert tipos[0] == "state"
+
+
+def test_ids_de_partida_son_impredecibles_y_largos(client):
+    gid = crear(client)
+    assert len(gid) >= 20
+
+
+def test_limpieza_de_sesiones_inactivas_al_crear(client, monkeypatch):
+    main.SESIONES.clear()
+    viejo = crear(client)
+    over = crear(client)
+    reciente = crear(client)
+    ahora = main._ahora()
+    main.SESIONES[viejo].last_activity = ahora - main.INACTIVIDAD_MAX - 1
+    main.SESIONES[over].game.phase = "game_over"
+    main.SESIONES[over].last_activity = ahora - main.GAME_OVER_MAX - 1
+    crear(client)
+    assert viejo not in main.SESIONES
+    assert over not in main.SESIONES
+    assert reciente in main.SESIONES
+
+
+def test_game_over_reciente_no_se_limpia(client):
+    main.SESIONES.clear()
+    over = crear(client)
+    main.SESIONES[over].game.phase = "game_over"
+    crear(client)
+    assert over in main.SESIONES
+
+
+def test_tope_duro_de_partidas_devuelve_503(client, monkeypatch):
+    main.SESIONES.clear()
+    monkeypatch.setattr(main, "MAX_SESIONES", 3)
+    for _ in range(3):
+        crear(client)
+    r = client.post("/games", json={"bots": 1, "chips": 200})
+    assert r.status_code == 503
+    assert "partidas" in r.json()["detail"].lower()
+    assert len(main.SESIONES) == 3
+
+
+def test_get_partida_toma_el_lock_de_la_sesion(client):
+    import asyncio
+    assert asyncio.iscoroutinefunction(main.obtener_partida)
+    gid = crear(client)
+    assert client.get(f"/games/{gid}").status_code == 200

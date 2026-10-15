@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import secrets
+import time
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -20,10 +21,23 @@ from .motor import FASES_APUESTA, Game, GameError
 settings = {"bot_delay": float(os.environ.get("POKER_BOT_DELAY", "0.6"))}
 
 
+MAX_SESIONES = 200          # tope duro de partidas simultaneas
+INACTIVIDAD_MAX = 30 * 60   # segundos sin actividad antes de limpiar
+GAME_OVER_MAX = 5 * 60      # segundos que se conserva una partida terminada
+
+
+def _ahora() -> float:
+    return time.monotonic()
+
+
 class Sesion:
     def __init__(self, game: Game):
         self.game = game
         self.lock = asyncio.Lock()
+        self.last_activity = _ahora()
+
+    def tocar(self) -> None:
+        self.last_activity = _ahora()
 
 
 SESIONES: Dict[str, Sesion] = {}
@@ -44,21 +58,36 @@ class NuevaPartida(BaseModel):
     chips: int = Field(ge=100, le=100000)
 
 
+def _limpiar_sesiones() -> None:
+    """Elimina partidas inactivas (>30 min) o terminadas hace mas de 5 min."""
+    ahora = _ahora()
+    for gid, s in list(SESIONES.items()):
+        inactiva = ahora - s.last_activity
+        if inactiva > INACTIVIDAD_MAX or (s.game.phase == "game_over" and inactiva > GAME_OVER_MAX):
+            del SESIONES[gid]
+
+
 @app.post("/games", status_code=201)
 def crear_partida(body: NuevaPartida):
-    game_id = secrets.token_hex(3)
+    _limpiar_sesiones()
+    if len(SESIONES) >= MAX_SESIONES:
+        raise HTTPException(status_code=503,
+                            detail="Hay demasiadas partidas activas, intenta de nuevo mas tarde")
+    game_id = secrets.token_urlsafe(16)
     while game_id in SESIONES:
-        game_id = secrets.token_hex(3)
+        game_id = secrets.token_urlsafe(16)
     SESIONES[game_id] = Sesion(Game(game_id, body.bots, body.chips))
     return {"game_id": game_id}
 
 
 @app.get("/games/{game_id}")
-def obtener_partida(game_id: str):
+async def obtener_partida(game_id: str):
     s = SESIONES.get(game_id)
     if s is None:
         raise HTTPException(status_code=404, detail="Partida no encontrada")
-    return s.game.state()
+    async with s.lock:  # no leer el estado a mitad de una mutacion
+        s.tocar()
+        return s.game.state()
 
 
 async def _enviar(ws: WebSocket, msg: dict) -> None:
@@ -109,6 +138,7 @@ async def ws_partida(ws: WebSocket, game_id: str):
     game = sesion.game
     try:
         async with sesion.lock:
+            sesion.tocar()
             await _enviar_estado(ws, game)
             pendientes, game.eventos_iniciales = game.eventos_iniciales, []
             for e in pendientes:
@@ -117,6 +147,7 @@ async def ws_partida(ws: WebSocket, game_id: str):
         while True:
             texto = await ws.receive_text()
             async with sesion.lock:
+                sesion.tocar()
                 await _procesar(ws, game, texto)
     except WebSocketDisconnect:
         return
