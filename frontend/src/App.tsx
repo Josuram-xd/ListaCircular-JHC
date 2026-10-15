@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { createGame } from './api'
 import { useGameSocket } from './useGameSocket'
 import SetupScreen from './components/SetupScreen'
+import MenuScreen from './components/MenuScreen'
+import DemoScreen from './demo/DemoScreen'
 import Table from './components/Table'
 import Controls from './components/Controls'
 import { ActionLog, GameOver, ResultBanner, ToastStack } from './components/Overlays'
 
 export default function App() {
+  const [screen, setScreen] = useState<'menu' | 'play' | 'demo'>('menu')
   const [gameId, setGameId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -25,14 +28,28 @@ export default function App() {
   }
 
   const reset = () => { setGameId(null); setError(null) }
+  const toMenu = () => { reset(); setScreen('menu') }
+
+  if (screen === 'menu') {
+    return <main className="app"><MenuScreen onPlay={() => setScreen('play')} onDemo={() => setScreen('demo')} /></main>
+  }
+  if (screen === 'demo') {
+    return <main className="app"><DemoScreen onBack={toMenu} /></main>
+  }
 
   if (!gameId) {
-    return <main className="app"><SetupScreen onPlay={play} loading={loading} error={error} /></main>
+    return (
+      <main className="app">
+        <button className="btn menu-back" onClick={toMenu} data-testid="setup-back">← Volver al menú</button>
+        <SetupScreen onPlay={play} loading={loading} error={error} />
+      </main>
+    )
   }
 
   const { state } = client
   return (
     <main className="app">
+      <button className="btn menu-back" onClick={toMenu} data-testid="game-menu">Menú</button>
       {status !== 'open' && (
         <div className="conn" role="alert">
           {status === 'closed'
